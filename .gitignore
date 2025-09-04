@@ -1,0 +1,6 @@
+# Ignore environment variable files
+.env
+*.lock
+# Ignore SQL dump files
+migrations/
+*.sql

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Chat</title>
+    <style>
+        body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; }
+        .sidebar { width: 200px; border-right: 1px solid #ccc; padding: 1rem; background-color: #f7f7f7; }
+        .chat-container { flex-grow: 1; display: flex; flex-direction: column; }
+        #messages { flex-grow: 1; padding: 1rem; overflow-y: auto; border-bottom: 1px solid #ccc; }
+        .input-area { display: flex; padding: 1rem; }
+        #messageBox { flex-grow: 1; padding: 0.5rem; }
+        #sendButton { padding: 0.5rem 1rem; margin-left: 0.5rem; }
+        #roomName { margin-bottom: 1rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Rooms</h2>
+        <div id="room-list-container"> 
+            <h4>Active Rooms</h4>
+            <ul id="roomList"></ul>
+        </div>
+        <hr>
+        <input type="text" id="roomName" placeholder="Enter room name">
+        <button id="joinButton">Join Room</button>
+    </div>
+    <div class="chat-container">
+        <div id="messages">Welcome! Join a room to start chatting.</div>
+        <div class="input-area">
+            <input type="text" id="messageBox" placeholder="Type a message..." disabled>
+            <button id="sendButton" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+            window.location.href = '/static/login.html';
+        }
+
+        const messagesDiv = document.getElementById('messages');
+        const messageBox = document.getElementById('messageBox');
+        const sendButton = document.getElementById('sendButton');
+        const roomNameInput = document.getElementById('roomName');
+        const joinButton = document.getElementById('joinButton');
+        const roomListUl = document.getElementById('roomList');
+        let socket;
+
+        async function fetchAndDisplayRooms() {
+            try {
+                const response = await fetch('/rooms');
+                if (!response.ok) return;
+
+                const rooms = await response.json();
+                roomListUl.innerHTML = ''; // 기존 목록 초기화
+
+                if (rooms.length === 0) {
+                    roomListUl.innerHTML = '<li>No active rooms.</li>';
+                } else {
+                    rooms.forEach(room => {
+                        const li = document.createElement('li');
+                        li.textContent = room;
+                        li.style.cursor = 'pointer';
+                        // 목록의 방 이름을 클릭하면 해당 방으로 바로 입장하도록 이벤트 추가
+                        li.addEventListener('click', () => {
+                            roomNameInput.value = room;
+                            connectToRoom();
+                        });
+                        roomListUl.appendChild(li);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch rooms:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAndDisplayRooms();
+            // 5초마다 주기적으로 방 목록을 새로고침합니다.
+            setInterval(fetchAndDisplayRooms, 5000); 
+        });
+
+        function connectToRoom() {
+            const room = roomNameInput.value.trim();
+            if (!room) {
+                alert('Please enter a room name.');
+                return;
+            }
+
+            if (socket) {
+                socket.close();
+            }
+            
+            const wsUrl = `ws://${window.location.host}/ws/${room}?token=${token}`;
+            socket = new WebSocket(wsUrl);
+            
+            messagesDiv.innerHTML = ''; // Clear previous messages
+            
+            socket.onopen = () => {
+                addMessage(`Connected to room: <strong>${room}</strong>`);
+                messageBox.disabled = false;
+                sendButton.disabled = false;
+                
+                // 방에 성공적으로 입장하면 방 목록을 즉시 갱신
+                fetchAndDisplayRooms(); 
+            };
+
+            socket.onmessage = (event) => {
+                addMessage(event.data);
+            };
+
+            socket.onclose = () => {
+                addMessage('Connection closed.');
+                messageBox.disabled = true;
+                sendButton.disabled = true;
+            };
+
+            socket.onerror = (error) => {
+                addMessage(`WebSocket Error: ${error}`);
+            };       
+        }
+        
+        function addMessage(message) {
+            const p = document.createElement('p');
+            p.innerHTML = message;
+            messagesDiv.appendChild(p);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        joinButton.addEventListener('click', connectToRoom);
+        roomNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') connectToRoom();
+        });
+
+        sendButton.addEventListener('click', () => {
+            const message = messageBox.value; // 메시지를 변수에 저장
+            if (socket && socket.readyState === WebSocket.OPEN && message) {
+                socket.send(message);
+                messageBox.value = '';
+            }
+        });
+
+        messageBox.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendButton.click();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+[package]
+name = "chat_project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["typed-header", "cookie"] } # "cookie" 기능 추가
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = [ "runtime-tokio", "postgres" ] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonwebtoken = "9"
+bcrypt = "0.15"
+dotenvy = "0.15"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+once_cell = "1.19"
+tower-http = { version = "0.5", features = ["fs"] } # tower-http 라이브러리 추가
+chrono = { version = "0.4", features = ["serde"] } # chrono 라이브러리 추가
